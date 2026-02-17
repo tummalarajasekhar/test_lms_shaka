@@ -1,6 +1,6 @@
 import pool from '@/lib/db';
 import Link from 'next/link';
-import DynamicPlayer from '@/components/DynamicPlayer'; // Import the Middleman
+import DynamicPlayer from '@/components/ShakaPlayer'; // Import the Middleman
 
 // Helper to fetch video from DB
 async function getVideo(id: string) {

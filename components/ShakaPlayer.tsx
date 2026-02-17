@@ -1,72 +1,104 @@
 "use client";
 import { useEffect, useRef } from 'react';
-import 'shaka-player/dist/controls.css'; // Import the CSS styles
-const shaka = require('shaka-player/dist/shaka-player.ui'); // Import the UI library
+import 'shaka-player/dist/controls.css';
 
-export default function ShakaPlayer() {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+const STREAMS = {
+  manifestUri: 'https://pub-f3f7b48ee2de4185b812cace3391b2a4.r2.dev/f7a469de-555e-481a-b637-ea13994d2ad4/manifest.mpd',
+  clearKeys: {
+    'a7a1ba9a35134b18b38c350db6bf58b6': '200baf2fafa84eb3b74ff7482214dc63'
+  }
+};
 
-    useEffect(() => {
-        let player: any;
-        let ui: any;
+export default function Player() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-        const initPlayer = async () => {
-            // 1. Wait for refs to be ready
-            if (!videoRef.current || !containerRef.current) return;
+  // Keep a reference to the active player so we can destroy it properly
+  const playerRef = useRef<any>(null);
+  const uiRef = useRef<any>(null);
 
-            // 2. Initialize the Player and UI Overlay
-            // (This replaces the 'data-shaka-player-container' auto-setup)
-            player = new shaka.Player(videoRef.current);
-            ui = new shaka.ui.Overlay(player, containerRef.current, videoRef.current);
+  useEffect(() => {
+    let mounted = true; // Flag to prevent running if component unmounted
 
-            // 3. Configure the Player (Exact same keys from your HTML)
-            player.configure({
-                drm: {
-                    clearKeys: {
-                        'a7a1ba9a35134b18b38c350db6bf58b6': '200baf2fafa84eb3b74ff7482214dc63'
-                    }
-                },
-                preferredKeySystems: ['org.w3.clearkey']
-            });
+    const initPlayer = async () => {
+      // 1. Wait for browser environment
+      if (typeof window === 'undefined' || !videoRef.current || !containerRef.current) return;
 
-            // 4. Error Listener
-            player.addEventListener('error', (event: any) => {
-                console.error('Shaka Error Code:', event.detail.code, 'Details:', event.detail);
-            });
+      // 2. Load Shaka Library dynamically
+      const shaka = (await import('shaka-player/dist/shaka-player.ui')).default;
 
-            // 5. Load the Video
-            try {
-                await player.load('https://pub-f3f7b48ee2de4185b812cace3391b2a4.r2.dev/f7a469de-555e-481a-b637-ea13994d2ad4/manifest.mpd');
-                console.log('✅ Video loaded successfully in Next.js!');
-            } catch (e: any) {
-                console.error('❌ Error loading video:', e);
-            }
-        };
+      // 3. Check if browser is supported
+      if (!shaka.Player.isBrowserSupported()) {
+        console.error('Browser not supported!');
+        return;
+      }
 
-        initPlayer();
+      // 4. CLEANUP: Destroy any existing player before creating a new one
+      // (This fixes the Next.js Strict Mode "Double Load" crash)
+      if (playerRef.current) {
+        await playerRef.current.destroy();
+        playerRef.current = null;
+      }
 
-        // Cleanup when leaving the page
-        return () => {
-            if (ui) ui.destroy();
-            if (player) player.destroy();
-        };
-    }, []);
+      // 5. Initialize
+      const player = new shaka.Player(videoRef.current);
+      const ui = new shaka.ui.Overlay(player, containerRef.current, videoRef.current);
 
-    return (
-        // The Container (Replacing the div with data-shaka-player-container)
-        <div
-            ref={containerRef}
-            className="relative w-full max-w-[800px] aspect-video bg-black rounded shadow-lg overflow-hidden mx-auto"
-        >
-            {/* The Video (Replacing the video tag) */}
-            <video
-                ref={videoRef}
-                className="w-full h-full"
-                autoPlay
-                muted
-                controls // Keep native controls enabled as a fallback
-            />
-        </div>
-    );
+      // Save to refs so we can clean them up later
+      playerRef.current = player;
+      uiRef.current = ui;
+
+      // 6. Configure Keys
+      player.configure({
+        drm: {
+          clearKeys: STREAMS.clearKeys
+        }
+      });
+
+      // 7. Error Listener (Logs specific error codes)
+      player.addEventListener('error', (event: any) => {
+        console.error('❌ Shaka Player Error:', event.detail.code, event.detail);
+      });
+
+      // 8. Load Video
+      try {
+        if (mounted) {
+          await player.load(STREAMS.manifestUri);
+          console.log('✅ Video loaded successfully!');
+        }
+      } catch (e: any) {
+        console.error('❌ Load failed. Error Code:', e.code, 'Details:', e);
+      }
+    };
+
+    initPlayer();
+
+    // CLEANUP FUNCTION (Runs when you leave the page or during Strict Mode re-render)
+    return () => {
+      mounted = false;
+      if (uiRef.current) {
+        uiRef.current.destroy();
+        uiRef.current = null;
+      }
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full max-w-[800px] aspect-video bg-black rounded-lg shadow-xl overflow-hidden mx-auto"
+    >
+      <video
+        ref={videoRef}
+        className="w-full h-full"
+        autoPlay
+        muted
+        controls
+      />
+    </div>
+  );
 }
