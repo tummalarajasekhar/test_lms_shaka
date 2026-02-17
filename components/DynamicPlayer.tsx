@@ -9,5 +9,5 @@ const VideoPlayer = dynamic(() => import('./Player'), {
 });
 
 export default function DynamicPlayer({ manifestUrl }: { manifestUrl: string }) {
-    return <VideoPlayer manifestUrl={manifestUrl} />;
+    return <VideoPlayer />;
 }

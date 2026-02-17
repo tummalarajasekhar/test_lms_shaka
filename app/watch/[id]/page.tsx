@@ -32,7 +32,7 @@ export default async function WatchPage({ params }: PageProps) {
                 <h1 className="text-3xl font-bold mb-6">{video.title || "Untitled Video"}</h1>
 
                 {/* Use the Middleman Component */}
-                <DynamicPlayer manifestUrl={video.manifest_url} />
+                <DynamicPlayer />
 
                 <div className="mt-6 p-4 bg-gray-800 rounded">
                     <h2 className="text-xl font-semibold mb-2">Debug Info</h2>
